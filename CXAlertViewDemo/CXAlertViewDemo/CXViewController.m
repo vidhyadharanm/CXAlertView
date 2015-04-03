@@ -44,7 +44,7 @@
     
 //    [[CXAlertView appearance] setTitleFont:[UIFont boldSystemFontOfSize:18.]];
 //    [[CXAlertView appearance] setTitleColor:[UIColor blackColor]];
-//    [[CXAlertView appearance] setCornerRadius:12];
+    [[CXAlertView appearance] setCornerRadius:0];
 //    [[CXAlertView appearance] setShadowRadius:20];
 //    [[CXAlertView appearance] setButtonColor:[UIColor colorWithRed:0.039 green:0.380 blue:0.992 alpha:1.000]];
 //    [[CXAlertView appearance] setCancelButtonColor:[UIColor colorWithRed:0.047 green:0.337 blue:1.000 alpha:1.000]];
@@ -159,21 +159,61 @@
 
 - (IBAction)showBlurAlert:(id)sender
 {
-    CXAlertView *alertView = [[CXAlertView alloc] initWithTitle:@"Blur Background Trigger \n Test" message:nil cancelButtonTitle:@"Dismiss"];
+    CXAlertView *alertView = [[CXAlertView alloc] initWithTitle:@"Blur & Stack Alert" message:@"Change the Blur or Stacking of the Buttons" cancelButtonTitle:nil];
     
-    [alertView addButtonWithTitle:@"Disable"
+    [alertView addButtonWithTitle:@"Add Button"
                              type:CXAlertViewButtonTypeCustom
                           handler:^(CXAlertView *alertView, CXAlertButtonItem *button) {
-                              alertView.showBlurBackground = NO;
+                              [alertView addButtonWithTitle:@"New Button" type:CXAlertViewButtonTypeDefault handler:nil];
                           }];
-    
-    [alertView addButtonWithTitle:@"Enable"
-                             type:CXAlertViewButtonTypeCustom
+
+    [alertView addButtonWithTitle:@"Blur"
+                             type:CXAlertViewButtonTypeDefault
                           handler:^(CXAlertView *alertView, CXAlertButtonItem *button) {
-                              alertView.showBlurBackground = YES;
+                              alertView.showBlurBackground = !alertView.showBlurBackground;
                           }];
+
+    [alertView addButtonWithTitle:@"Change Stack"
+                             type:CXAlertViewButtonTypeDefault
+                          handler:^(CXAlertView *alertView, CXAlertButtonItem *button) {
+                              alertView.stackedButtons = !alertView.stackedButtons;
+                          }];
+
+    [alertView addButtonWithTitle:@"Close"
+                             type:CXAlertViewButtonTypeCancel
+                          handler:^(CXAlertView *alertView, CXAlertButtonItem *button) {
+                              [alertView dismiss];
+                          }];
+
+    [alertView setShowBlurBackground:NO];
+    [alertView setShowButtonLine:YES];
+    alertView.stackedButtons = YES;
+
+    [alertView setCustomButtonImage:[self imageWithColor:[UIColor redColor]] forState:UIControlStateNormal];
+    [alertView setCustomButtonImage:[self imageWithColor:[[UIColor redColor] colorWithAlphaComponent:0.8f]] forState:UIControlStateHighlighted];
+    [alertView setCustomButtonColor:[UIColor whiteColor]];
+
+    [alertView setCancelButtonImage:[self imageWithColor:[UIColor greenColor]] forState:UIControlStateNormal];
+    [alertView setCancelButtonImage:[self imageWithColor:[[UIColor greenColor] colorWithAlphaComponent:0.8f]] forState:UIControlStateHighlighted];
+    [alertView setCancelButtonColor:[UIColor purpleColor]];
+
     
     [alertView show];
+}
+
+- (UIImage *)imageWithColor:(UIColor *)color
+{
+    CGRect rect = CGRectMake(0.0f, 0.0f, 1.0f, 1.0f);
+    UIGraphicsBeginImageContext(rect.size);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    
+    CGContextSetFillColorWithColor(context, [color CGColor]);
+    CGContextFillRect(context, rect);
+    
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    return image;
 }
 
 - (IBAction)showCXAlert:(id)sender

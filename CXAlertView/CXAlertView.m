@@ -141,7 +141,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 
 // Buttons
 - (UIFont*)fontForButtonType:(CXAlertViewButtonType)type;
-- (CGRect)frameWithButtonTitile:(NSString *)title type:(CXAlertViewButtonType)type;
+- (CGRect)frameWithButtonTitle:(NSString *)title type:(CXAlertViewButtonType)type;
 - (void)addButtonWithTitle:(NSString *)title type:(CXAlertViewButtonType)type handler:(CXAlertButtonHandler)handler font:(UIFont *)font;
 - (CXAlertButtonItem *)buttonItemWithType:(CXAlertViewButtonType)type font:(UIFont *)font;
 - (void)buttonAction:(CXAlertButtonItem *)buttonItem;
@@ -241,6 +241,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 
         _showButtonLine = YES;
         _showBlurBackground = YES;
+        _stackedButtons = NO;
         [self setupScrollViews];
         if (cancelButtonTitle) {
             [self addButtonWithTitle:cancelButtonTitle type:CXAlertViewButtonTypeCancel handler:^(CXAlertView *alertView, CXAlertButtonItem *button) {
@@ -477,6 +478,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
     CGFloat height = 0;
     height += ([self heightForTopScrollView] + self.scrollViewPadding);
     height += ([self heightForContentScrollView] + self.scrollViewPadding);
+    height += self.scrollViewPadding;
     height += ([self heightForBottomScrollView] + self.scrollViewPadding);
     return height;
 }
@@ -493,7 +495,10 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 
 - (CGFloat)heightForBottomScrollView
 {
-    if (self.buttons.count > 0) {
+    if (_buttons.count > 0) {
+        if (_stackedButtons) {
+            return _maxButtonHeight * _buttons.count;
+        }
         return _maxButtonHeight;
     }
     return self.bottomScrollViewHeight;
@@ -678,7 +683,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 
     y += [self heightForContentScrollView] + self.scrollViewPadding;
 
-    y += self.scrollViewPadding;
+    y += self.scrollViewPadding * 2;
 
     _bottomScrollView.backgroundColor = [UIColor clearColor];
     _bottomScrollView.frame = CGRectMake( 0, y, self.containerWidth, [self heightForBottomScrollView]);
@@ -822,21 +827,33 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 	return font;
 }
 
-- (CGRect)frameWithButtonTitile:(NSString *)title type:(CXAlertViewButtonType)type
+- (CGRect)frameWithButtonTitle:(NSString *)title type:(CXAlertViewButtonType)type
+{
+    return [self frameWithButtonTitle:title type:type index:_buttons.count];
+}
+
+- (CGRect)frameWithButtonTitle:(NSString *)title type:(CXAlertViewButtonType)type index:(NSUInteger)buttonIndex
 {
     self.buttonHeight = kDefaultButtonHeight;
     CGRect frame;
     frame.size = CGSizeMake(self.containerWidth/2, self.buttonHeight);
     
-    if (_buttons.count == 1) {
-        frame.origin = CGPointMake(0., 0.);
+    if (_stackedButtons) {
+        frame.origin = CGPointMake(0., _maxButtonHeight * (buttonIndex - 1));
         frame.size.width = self.containerWidth;
     }
-    else if (_buttons.count == 2) {
+    else if (buttonIndex == 1) {
+        frame.origin = CGPointMake(0., 0.);
+        if (_buttons.count == 1) {
+            // Full width if only 1 button
+            frame.size.width = self.containerWidth;
+        }
+    }
+    else if (buttonIndex == 2) {
         frame.origin = CGPointMake(self.containerWidth/2, 0.);
     }
     else {
-        CXAlertButtonItem *lastButton = _buttons[_buttons.count - 2];
+        CXAlertButtonItem *lastButton = _buttons[buttonIndex - 2];
         frame.origin = CGPointMake(CGRectGetMaxX(lastButton.frame), 0);
     }
     
@@ -866,6 +883,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
     button.action = handler;
     button.type = type;
     button.defaultRightLineVisible = NO;
+    button.stackedButtons = _stackedButtons;
     [button setTitle:title forState:UIControlStateNormal];
 
 	button.titleLabel.textAlignment=TA_CENTER;
@@ -873,44 +891,47 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 	button.titleLabel.lineBreakMode=BT_LBM;
 //	[button setTitleEdgeInsets:UIEdgeInsetsMake(10.0, 10.0, 10.0, 10.0)];
 
-    CGFloat contentWidthOffset = 0.;
     [_buttons addObject:button];
     
     if ([_buttons count] == 1)
 	{
 		button.defaultRightLineVisible = NO;
-		button.frame = [self frameWithButtonTitile:title type:type];
+		button.frame = [self frameWithButtonTitle:title type:type];
+        [self updateBottomScrollView];
 	}
 	else
 	{
-		// correct first button
-		CXAlertButtonItem *firstButton = [_buttons objectAtIndex:0];
-		firstButton.defaultRightLineVisible = _showButtonLine;
-        CGFloat lastFirstButtonWidth = CGRectGetWidth(firstButton.frame);
-		CGRect newFrame = CGRectMake( 0, 0, self.containerWidth/2, CGRectGetHeight(firstButton.frame));
-		newFrame.origin.x = 0;
-        contentWidthOffset = lastFirstButtonWidth - CGRectGetWidth(newFrame);
+		// correct previous last button
+        NSInteger previousButtonIndex = _buttons.count - 2;
+        NSLog(@"Correcting button: %ld", (long)previousButtonIndex);
+		CXAlertButtonItem *previousButton = [_buttons objectAtIndex:previousButtonIndex];
+		previousButton.defaultRightLineVisible = _showButtonLine;
         
-		if (self.isVisible) {
-            CGRect buttonFrame = [self frameWithButtonTitile:title type:type];
+        CGRect newPreviousButtonFrame = [self frameWithButtonTitle:previousButton.title type:previousButton.type index:(previousButtonIndex + 1)];
+        CGRect buttonFrame = [self frameWithButtonTitle:title type:type];
+        
+        if (self.isVisible) {
             button.alpha = 0.;
-            button.frame = CGRectMake( 0, 0, CGRectGetWidth(buttonFrame), CGRectGetHeight(buttonFrame));
-			[UIView animateWithDuration:0.3 animations:^{
-				firstButton.frame = newFrame;
-				button.alpha = 1.;
-				button.frame = buttonFrame;
-			}];
-		}
-		else {
-			firstButton.frame = newFrame;
-			button.alpha = 1.;
-			button.frame = [self frameWithButtonTitile:title type:type];
-		}
+            button.frame = CGRectMake(0, 0, CGRectGetWidth(buttonFrame), CGRectGetHeight(buttonFrame));
+            [UIView animateWithDuration:0.3 animations:^{
+                previousButton.frame = newPreviousButtonFrame;
+                button.alpha = 1.;
+                button.frame = buttonFrame;
+            }];
+        }
+        else {
+            previousButton.frame = newPreviousButtonFrame;
+            button.alpha = 1.;
+            button.frame = buttonFrame;
+        }
 	}
 
 	[_bottomScrollView addSubview:button];
     
-    _bottomScrollView.contentSize = CGSizeMake(CGRectGetMaxX(button.frame), _maxButtonHeight);
+    CGFloat height = _stackedButtons ? _maxButtonHeight * _buttons.count : _maxButtonHeight;
+    _bottomScrollView.contentSize = CGSizeMake(CGRectGetMaxX(button.frame), height);
+    [self updateBottomScrollView];
+
 }
 
 - (CXAlertButtonItem *)buttonItemWithType:(CXAlertViewButtonType)type font:(UIFont *)font
@@ -1175,6 +1196,25 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
         return;
     }
     _showButtonLine = showButtonLine;
+    [self updateBottomScrollView];
+}
+
+- (void)setStackedButtons:(BOOL)stackedButtons
+{
+    if (_stackedButtons == stackedButtons) {
+        return;
+    }
+    _stackedButtons = stackedButtons;
+    NSUInteger buttonCount = 0;
+    for (CXAlertButtonItem *button in _buttons) {
+        button.stackedButtons = _stackedButtons;
+        button.frame = [self frameWithButtonTitle:button.title type:button.type index:++buttonCount];
+    }
+    _bottomScrollView.contentOffset = CGPointMake(0, 0);
+    CGFloat width = _stackedButtons ? self.containerWidth : buttonCount * (self.containerWidth / 2);
+    width = MIN(self.containerWidth, width);
+    CGFloat height = _stackedButtons ? _maxButtonHeight * buttonCount : _maxButtonHeight;
+    _bottomScrollView.contentSize = CGSizeMake(width, height);
     [self updateBottomScrollView];
 }
 @end
