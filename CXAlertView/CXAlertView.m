@@ -903,7 +903,6 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
 	{
 		// correct previous last button
         NSInteger previousButtonIndex = _buttons.count - 2;
-        NSLog(@"Correcting button: %ld", (long)previousButtonIndex);
 		CXAlertButtonItem *previousButton = [_buttons objectAtIndex:previousButtonIndex];
 		previousButton.defaultRightLineVisible = _showButtonLine;
         
