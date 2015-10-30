@@ -524,6 +524,7 @@ static BOOL __cx_statsu_prefersStatusBarHidden;
     [self.alertWindow removeFromSuperview];
     self.alertWindow = nil;
     self.layoutDirty = NO;
+    [self removeFromSuperview];
 }
 
 - (void)validateLayout
